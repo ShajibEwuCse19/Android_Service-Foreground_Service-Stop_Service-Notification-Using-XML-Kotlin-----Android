@@ -5,12 +5,14 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 
 
 /**
@@ -31,14 +33,12 @@ class MyService : Service() {
 
     val CHANNEL_ID: String = "CHANNEL_ID"
 
-    inner class LocalBinder : Binder() {
+    inner class LocalBinder : Binder() { // pros and cons of inner classes
         fun getService(): MyService = this@MyService
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-
-        val intentAction = intent?.action
-        when (intentAction) {
+        when (intent?.action) {
             START_SERVICE -> {
                 showToast("Service Started")
             }
@@ -58,26 +58,27 @@ class MyService : Service() {
     fun doForegroundThings() {
         showToast("Going to Foreground")
         createNotificationChannel()
-
-        val notificationIntent = Intent(this, MainActivity::class.java)
-        val pendingIntent = PendingIntent.getActivity(
-            this, 0, notificationIntent,
-            PendingIntent.FLAG_IMMUTABLE
-        )
-
         isForegroundService = true
-
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("My Foreground Service [Notification]")
             .setContentText("This is a foreground service [Notification]")
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setContentIntent(pendingIntent)
+            .setContentIntent(
+                PendingIntent.getActivity(
+                    this, 0, Intent(this, MainActivity::class.java),
+                    PendingIntent.FLAG_IMMUTABLE
+                )
+            )
 
         val notification = builder.build()
-
         with(NotificationManagerCompat.from(this)) {
-            notify(4, notification)
+            if (ContextCompat.checkSelfPermission(
+                    applicationContext,
+                    android.Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+            )
+                notify(4, notification)
         }
     }
 
@@ -98,7 +99,7 @@ class MyService : Service() {
     private fun stopThisService() {
         showToast("Service Stopped")
         try {
-            stopForeground(true)
+            stopForeground(STOP_FOREGROUND_DETACH)
             isForegroundService = false
             stopSelf()
         } catch (e: Exception) {
